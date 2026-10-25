@@ -1,4 +1,4 @@
-package ORM;
+package ORM.Exceptions;
 
 public class ColumnaAusenteException extends ORMException{
 

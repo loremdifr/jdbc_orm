@@ -1,5 +1,10 @@
 package ORM;
 
+import ORM.Annotations.NoSeGuarda;
+import ORM.Exceptions.TablaModificadaException;
+import ORM.Exceptions.TablaNoRegistradaException;
+import ORM.Interfaces.ITabla;
+
 public abstract class Tabla implements ITabla{
 
 	@NoSeGuarda
@@ -12,7 +17,7 @@ public abstract class Tabla implements ITabla{
 
 	public Object PK()
 	throws TablaModificadaException,
-		   TablaNoRegistradaException
+		TablaNoRegistradaException
 	{
 		return SQL.valorDePK(this);
 	}

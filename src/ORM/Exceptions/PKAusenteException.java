@@ -1,4 +1,6 @@
-package ORM;
+package ORM.Exceptions;
+
+import ORM.Tabla;
 
 public class PKAusenteException extends ORMException{
 	public PKAusenteException(Class<? extends Tabla> tabla){

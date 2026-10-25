@@ -1,4 +1,6 @@
-package ORM;
+package ORM.Exceptions;
+
+import ORM.Tabla;
 
 public class TablaNoRegistradaException extends ORMException{
 	public TablaNoRegistradaException(Class<? extends Tabla> tabla){

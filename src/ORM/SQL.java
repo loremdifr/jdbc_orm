@@ -1,5 +1,9 @@
 package ORM;
 
+import ORM.Annotations.ClavePrimaria;
+import ORM.Annotations.NoSeGuarda;
+import ORM.Exceptions.*;
+
 import javax.naming.OperationNotSupportedException;
 
 import java.io.IOException;
@@ -11,27 +15,77 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 //TODO: indices
 
 public class SQL{
 
+	sealed interface Query permits SelectQuery, AlterTableQuery, CreateTableQuery{}
+
+	public record SelectQuery(
+		ArrayList<String> select,
+		String            from,
+		ArrayList<String> where,
+		ArrayList<String> groupBy,
+		ArrayList<String> orderBy,
+		ArrayList<String> limit
+	) implements Query{
+		SelectQuery(String from){
+			this(null, from, null, null, null, null);
+		}
+	}
+
+	public record CreateTableQuery(Schema schema) implements Query{
+		@Override
+		public String toString(){
+			final var cols_str = new ArrayList<String>();
+
+			for(final var col : schema.columnas().values()){
+				//column_name type AUTO_INCREMENT NOT NULL UNIQUE DEFAULT X
+				final var col_str = new ArrayList<String>();
+
+				col_str.add(col.nombre()); //nombre
+				col_str.add(col.tipo().sqlString()); //tipo
+
+				//TODO: fk?
+				if(col.pk()){
+					col_str.add("AUTO_INCREMENT");
+					col_str.add("NOT NULL");
+					col_str.add("UNIQUE");
+				}
+//				col_str.add("DEFAULT %s");
+
+				cols_str.add(String.join(" ", col_str));
+			}
+
+			cols_str.add("PRIMARY KEY (%s)".formatted(
+				schema.columnas().get(schema.pk()).nombre()
+			));
+
+			//TODO: fkeys?
+
+			return "CREATE TABLE IF NOT EXISTS %s (%s);".formatted(
+				schema.tabla(), String.join(",\n", cols_str));
+		}
+	}
+
 	public record AlterTableQuery(
 		ArrayList<Columna> add_columns,
 		ArrayList<Columna> modify_columns,
 		ArrayList<Columna> drop_columns
-	){}
+	) implements Query{}
 
 	public enum TipoColumna{
 		AUTO    (""),
 		BOOL    ("BOOL"),
 		INT     ("INT"),
-		LONG    ("LONG"),
+		BIGINT  ("BIGINT"),
 		FLOAT   ("FLOAT"),
 		DOUBLE  ("DOUBLE"),
 		DECIMAL ("DECIMAL"),
-		VARCHAR ("VARCHAR"),
+		VARCHAR ("VARCHAR(255)"), //TODO: parametrizar?
 		TEXT    ("TEXT"),
 		DATETIME("DATETIME"),
 		;
@@ -52,7 +106,7 @@ public class SQL{
 	public record Columna(
 		String nombre,
 		TipoColumna tipo,
-		boolean nullable,
+		boolean not_null,
 		boolean pk
 	){}
 	public record Schema(
@@ -150,11 +204,11 @@ public class SQL{
 		return false;
 	}
 
-	static public ArrayList<Tabla> buscar(
+	static public SelectQuery buscar(
 		Class<? extends Tabla> tabla
 	){
-		//TODO:
-		return null;
+		final var nombre_tabla = tablas.get(tabla).tabla();
+		return new SelectQuery(nombre_tabla);
 	}
 
 	static public Tabla buscarPorPK(
@@ -169,12 +223,15 @@ public class SQL{
 		Class<? extends Tabla> tabla,
 		Schema schema
 	) throws SQLException, ORMException{
-		if(!existeTabla(schema)) return;
+		if(!existeTabla(schema)){
+			crearTabla(schema);
+		}else{
+			final var db_schema = extraerSchemaDeDB(tabla, schema.tabla());
+			if(db_schema.equals(schema)) return;
 
-		final var db_schema = extraerSchemaDeDB(tabla, schema.tabla());
-		if(db_schema.equals(schema)) return;
+			actualizarTabla(schema, db_schema);
+		}
 
-		actualizarTabla(schema, db_schema);
 	}
 
 	private static void actualizarTabla(Schema schema_esperado, Schema schema_en_db){
@@ -251,11 +308,21 @@ public class SQL{
 		return null;
 	}
 
-	private static void crearTabla(Schema schema){
+	private static void crearTabla(Schema schema)
+	throws SQLException{
+		final var statement = conexion.createStatement();
+		final var query = new CreateTableQuery(schema);
+		statement.executeUpdate(query.toString());
+		statement.close();
 	}
 
-	static public boolean existeTabla(Schema schema){
-		return false;
+	static public boolean existeTabla(Schema schema) throws SQLException{
+		final var statement = conexion.createStatement();
+		final var sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '%s';";
+		final var result = statement.executeQuery(sql.formatted(schema.tabla()));
+		final var success = result.next() && result.getInt(1) > 0;
+		statement.close();
+		return success;
 	}
 
 	//priv
@@ -271,7 +338,7 @@ public class SQL{
 			.toList()
 			.getFirst()
 			.getKey();
-		return new Schema(tabla.toString(), columnas, pk);
+		return new Schema(camelToSnake(tabla.getSimpleName()), columnas, pk);
 	}
 
 	static private HashMap<Field, Columna> columnasDeTabla(
@@ -326,7 +393,7 @@ public class SQL{
 
 	static private TipoColumna tipoDeColumna(Field field)
 	throws TipoDeColumnaInvalidaException{
-		final var nota = field.getAnnotation(ORM.Columna.class);
+		final var nota = field.getAnnotation(ORM.Annotations.Columna.class);
 		final var tipo = field.getType();
 
 		if(nota != null
@@ -339,8 +406,8 @@ public class SQL{
 		if(tipo == boolean.class)       return TipoColumna.BOOL;
 		if(tipo == int.class)           return TipoColumna.INT;
 		if(tipo == Integer.class)       return TipoColumna.INT;
-		if(tipo == long.class)          return TipoColumna.LONG;
-		if(tipo == Long.class)          return TipoColumna.LONG;
+		if(tipo == long.class)          return TipoColumna.BIGINT;
+		if(tipo == Long.class)          return TipoColumna.BIGINT;
 		if(tipo == float.class)         return TipoColumna.FLOAT;
 		if(tipo == Float.class)         return TipoColumna.FLOAT;
 		if(tipo == double.class)        return TipoColumna.DOUBLE;

@@ -1,5 +1,5 @@
-import ORM.ClavePrimaria;
-import ORM.Columna;
+import ORM.Annotations.ClavePrimaria;
+import ORM.Annotations.Columna;
 import ORM.SQL;
 import ORM.Tabla;
 
