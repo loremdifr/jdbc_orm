@@ -1,8 +1,16 @@
 package ORM;
 
 import ORM.Annotations.ClavePrimaria;
+import ORM.Annotations.GuardarComo;
 import ORM.Annotations.NoSeGuarda;
+import ORM.Clases.Tabla;
 import ORM.Exceptions.*;
+import ORM.Queries.AlterTableQuery;
+import ORM.Queries.CreateTableQuery;
+import ORM.Queries.SelectQuery;
+import ORM.SQL.Columna;
+import ORM.SQL.Schema;
+import ORM.SQL.TipoColumna;
 
 import javax.naming.OperationNotSupportedException;
 
@@ -15,107 +23,13 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.*;
-import java.util.stream.Collectors;
 
 
 //TODO: indices
 
-public class SQL{
+public class DB{
 
-	sealed interface Query permits SelectQuery, AlterTableQuery, CreateTableQuery{}
-
-	public record SelectQuery(
-		ArrayList<String> select,
-		String            from,
-		ArrayList<String> where,
-		ArrayList<String> groupBy,
-		ArrayList<String> orderBy,
-		ArrayList<String> limit
-	) implements Query{
-		SelectQuery(String from){
-			this(null, from, null, null, null, null);
-		}
-	}
-
-	public record CreateTableQuery(Schema schema) implements Query{
-		@Override
-		public String toString(){
-			final var cols_str = new ArrayList<String>();
-
-			for(final var col : schema.columnas().values()){
-				//column_name type AUTO_INCREMENT NOT NULL UNIQUE DEFAULT X
-				final var col_str = new ArrayList<String>();
-
-				col_str.add(col.nombre()); //nombre
-				col_str.add(col.tipo().sqlString()); //tipo
-
-				//TODO: fk?
-				if(col.pk()){
-					col_str.add("AUTO_INCREMENT");
-					col_str.add("NOT NULL");
-					col_str.add("UNIQUE");
-				}
-//				col_str.add("DEFAULT %s");
-
-				cols_str.add(String.join(" ", col_str));
-			}
-
-			cols_str.add("PRIMARY KEY (%s)".formatted(
-				schema.columnas().get(schema.pk()).nombre()
-			));
-
-			//TODO: fkeys?
-
-			return "CREATE TABLE IF NOT EXISTS %s (%s);".formatted(
-				schema.tabla(), String.join(",\n", cols_str));
-		}
-	}
-
-	public record AlterTableQuery(
-		ArrayList<Columna> add_columns,
-		ArrayList<Columna> modify_columns,
-		ArrayList<Columna> drop_columns
-	) implements Query{}
-
-	public enum TipoColumna{
-		AUTO    (""),
-		BOOL    ("BOOL"),
-		INT     ("INT"),
-		BIGINT  ("BIGINT"),
-		FLOAT   ("FLOAT"),
-		DOUBLE  ("DOUBLE"),
-		DECIMAL ("DECIMAL"),
-		VARCHAR ("VARCHAR(255)"), //TODO: parametrizar?
-		TEXT    ("TEXT"),
-		DATETIME("DATETIME"),
-		;
-
-		final private String sqlString;
-		TipoColumna(String sqlString){ this.sqlString = sqlString; }
-		public String sqlString(){ return sqlString; }
-
-		static public TipoColumna fromString(String str)
-		throws TipoDeColumnaInesperadoException{
-			for(var tipo_columna : values()){
-				if(tipo_columna.sqlString().equals(str)) return tipo_columna;
-			}
-			throw new TipoDeColumnaInesperadoException(str);
-		}
-
-	}
-	public record Columna(
-		String nombre,
-		TipoColumna tipo,
-		boolean not_null,
-		boolean pk
-	){}
-	public record Schema(
-		String tabla,
-		HashMap<Field, Columna> columnas,
-		Field pk
-	){}
-
-	private SQL() throws OperationNotSupportedException{
+	private DB() throws OperationNotSupportedException{
 		throw new OperationNotSupportedException(
 			"Esta clase es estática, no hace falta instanciarla."
 		);
@@ -126,7 +40,7 @@ public class SQL{
 
 
 	static {
-		var config_file = SQL.class.getResourceAsStream("db.properties");
+		var config_file = DB.class.getResourceAsStream("db.properties");
 		var db_config = new Properties();
 		try{
 			db_config.load(config_file);
@@ -153,32 +67,37 @@ public class SQL{
 	}
 
 	/**
-	 * agregar clases que se usan en la DB. el ORM se encarga
-	 * de que la tabla exista y sus campos estén actualizados.
+	 * agrega las clases que se usan en la DB. el ORM se encarga
+	 * de que las tablas existan y sus campos estén actualizados.
 	 * <p>
 	 * <b>Cómo se usa:</b>
 	 * </p>
 	 * <pre>
-	 * //clase o record debe implementar ORM.Guardable:
-	 * class Usuario implements ORM.Guardable{}
-	 * record Pedido(..) implements ORM.Guardable{}
+	 * //las clases deben extender Tabla:
+	 * class Pedido extends Tabla{}
+	 * class Usuario extends Tabla{
+	 *     private OneToMany<Pedido> pedidos;
+	 * }
 	 *
 	 * //en main:
-	 * ORM.SQL.registrarTable(Usuario.class);
-	 * ORM.SQL.registrarTable(Pedido.class);
+	 * DB.registrarTablas(Usuario.class, Pedido.class);
 	 * </pre>
 	 */
-	static public void registrarTabla(
-		Class<? extends Tabla> tabla
-	) throws ORMException, SQLException{
-		if(tablas.containsKey(tabla)) return;
+	@SafeVarargs
+	public static void registrarTablas(Class<? extends Tabla> ...clases)
+	throws ORMException, SQLException{
+		for(final var clase : clases){
+			if(tablas.containsKey(clase)) return;
 
-		var schema = generarSchema(tabla);
-		tablas.put(tabla, schema);
+			var schema = generarSchema(clase);
+			tablas.put(clase, schema);
 
-//		Utils.prettyPrint(tablas);
+	//		Utils.prettyPrint(tablas);
 
-		crearOActualizarTabla(tabla, schema);
+		}
+		//TODO: llamar a esto al final de todo
+//		crearOActualizarTabla(clase, schema);
+
 	}
 
 	public static Object valorDePK(Tabla fila)
@@ -393,7 +312,7 @@ public class SQL{
 
 	static private TipoColumna tipoDeColumna(Field field)
 	throws TipoDeColumnaInvalidaException{
-		final var nota = field.getAnnotation(ORM.Annotations.Columna.class);
+		final var nota = field.getAnnotation(GuardarComo.class);
 		final var tipo = field.getType();
 
 		if(nota != null
@@ -428,6 +347,4 @@ public class SQL{
 	static private String camelToSnake(String str){
 		return str.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
 	}
-
-
 }

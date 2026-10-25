@@ -1,6 +1,8 @@
 package ORM;
 
 import javax.naming.OperationNotSupportedException;
+import java.lang.reflect.ParameterizedType;
+import java.lang.reflect.Type;
 
 public class Utils{
 	private Utils() throws OperationNotSupportedException{
@@ -36,4 +38,5 @@ public class Utils{
 			}
 		}
 	}
+
 }

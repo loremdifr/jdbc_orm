@@ -1,5 +1,5 @@
 import ORM.Exceptions.ORMException;
-import ORM.SQL;
+import ORM.DB;
 
 import java.sql.SQLException;
 
@@ -8,6 +8,7 @@ import java.sql.SQLException;
 //TODO: lastModified
 //TODO: transactions
 //TODO: asociaciones
+//TODO: enums -> store as varchar (startup check that nothing invalid is stored in the db!)
 
 void main() throws ORMException, SQLException{
 
@@ -17,7 +18,10 @@ void main() throws ORMException, SQLException{
 	// - la db no se crea sola, asi que hay que crearla en blanco
 
 	//registro clases en SQL y se auto-crean las tablas en la DB:
-	SQL.registrarTabla(Usuario.class);
+	DB.registrarTablas(
+		Usuario.class,
+		Empresa.class
+	);
 	// si le cambias los datos a la clase Usuario, se van a mantener
 	// actualizados en la DB solitos.
 
@@ -30,10 +34,10 @@ void main() throws ORMException, SQLException{
 	System.out.println("guardado: " + mi_usuario.guardado());
 	mi_usuario.guardar();
 
-	var pk = mi_usuario.PK();
+	var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
 
-	//Despues puedo buscarlo:
-	var usuario_especifico = SQL.buscarPorPK(Usuario.class, pk);
+	//Despues puedo buscarlo directamente por PK:
+	var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
 
 	//O puedo buscar lo que quiera:
 //	var jared = SQL.buscar(Usuario.class)
