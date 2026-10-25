@@ -1,39 +1,29 @@
+import ORM.ClavePrimaria;
 import ORM.Columna;
-import ORM.ITabla;
 import ORM.SQL;
+import ORM.Tabla;
 
-public class Usuario implements ITabla{
+import java.time.LocalDateTime;
 
+public class Usuario extends Tabla{
+
+	@ClavePrimaria
 	private long id;
-	private boolean borrado;
 	private String nombre;
 	private int edad;
+	private LocalDateTime ultimaModificacion;
 
 	@Columna(tipo = SQL.TipoColumna.TEXT)
 	private String biografia;
 
-	@Override
-	public long getId(){
-		return 0;
-	}
-
-	@Override
-	public boolean getFechaModificacion(){
-		return false;
-	}
-
-	@Override
-	public boolean getBorrado(){
-		return false;
-	}
-
-	@Override
-	public boolean guardar(){
-		return false;
-	}
-
-	@Override
-	public boolean estaGuardado(){
-		return false;
+	public Usuario(
+		String nombre,
+		int edad,
+		String biografia
+	){
+		this.nombre = nombre;
+		this.edad = edad;
+		this.biografia = biografia;
+		this.ultimaModificacion = null;
 	}
 }

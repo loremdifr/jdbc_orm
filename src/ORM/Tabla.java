@@ -1,37 +1,20 @@
 package ORM;
 
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-
 public abstract class Tabla implements ITabla{
 
-//	@ClavePrimaria
-//	private long id;
-//	private LocalDateTime fechaModificacion;
-//	private boolean borrado;
-
 	@NoSeGuarda
-	private boolean guardado;
+	private boolean guardado = false;
 
-	//relaciones..?
+	//TODO: relaciones..?
 
-	public boolean guardar(){
-		//TODO:
-		return false;
+	public boolean guardar(){ return SQL.guardar(this); }
+	public boolean guardado(){ return guardado; }
+
+	public Object PK()
+	throws TablaModificadaException,
+		   TablaNoRegistradaException
+	{
+		return SQL.valorDePK(this);
 	}
-
-//	public long getId(){ return id; }
-//	public LocalDateTime getFechaModificacion(){ return fechaModificacion; }
-//	public boolean isGuardado(){ return guardado; }
-//	public boolean isBorrado(){ return borrado; }
-
-	public ArrayList<Tabla> buscar(){
-		return SQL.buscar(getClass());
-	}
-
-	public Tabla buscarPorId(long id){
-		return SQL.buscarPorId(getClass(), id);
-	}
-
 
 }

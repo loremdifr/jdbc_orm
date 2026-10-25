@@ -29,6 +29,7 @@ bin/
 ### Mac OS ###
 .DS_Store
 
+.idea/inspectionProfiles/*
 # lo siguiente viene de las recomendaciones de jetbrains:
 # https://intellij-support.jetbrains.com/hc/en-us/articles/206544839-How-to-manage-projects-under-Version-Control-Systems
 # https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

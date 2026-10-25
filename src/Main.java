@@ -1,22 +1,77 @@
+import ORM.ORMException;
 import ORM.SQL;
 
-void main() {
+import java.sql.SQLException;
 
-	/*
-	* TODO:
-	*  [ ] move credentials to .env and add to gitignore
-	*  [ ] make the schema self-migrating
-	*  [ ] make the
-	*  [ ]
-	*  [ ]
-	*
-	*
-	* make a record or class storable by making it implement the interface ORM.Guardable
-	*
-	*
-	*
-	* */
+//TODO: queries
+//TODO: softDelete trait o algo asi?
+//TODO: lastModified
+//TODO: transactions
+//TODO: asociaciones
 
+void main() throws ORMException, SQLException{
+
+	//requisito para usar esto:
+	// - copiar el archivo db.properties.default a db.properties
+	// - modificarlo con los datos de acceso a su db
+	// - la db no se crea sola, asi que hay que crearla en blanco
+
+	//registro clases en SQL y se auto-crean las tablas en la DB:
 	SQL.registrarTabla(Usuario.class);
+	// si le cambias los datos a la clase Usuario, se van a mantener
+	// actualizados en la DB solitos.
+
+	//guardar en la db es asi:
+	var mi_usuario = new Usuario(
+		"Jared",
+		19,
+		"What up, I'm Jared, I'm 19, and I never fucking learned how to read"
+	);
+	System.out.println("guardado: " + mi_usuario.guardado());
+	mi_usuario.guardar();
+
+	var pk = mi_usuario.PK();
+
+	//Despues puedo buscarlo:
+	var usuario_especifico = SQL.buscarPorPK(Usuario.class, pk);
+
+	//O puedo buscar lo que quiera:
+//	var jared = SQL.buscar(Usuario.class)
+////		.where("nombre", "=", "Jared")
+//		.where("nombre", "LIKE", "J%")
+//		.andWhere("edad", ">", 18)
+//		.first(); //le mete limit 1, y te devuelve solo el primer resultado
+
+	//llamando a toList() se obtiene un ArrayList
+//	var usuarios = SQL.buscar(Usuario.class)
+//		.where("nombre", "LIKE", "J%")
+//		.orWhere("nombre", "IN", "Pedro", "Pablo")
+//		.groupBy("edad")
+//		.limit(12)
+//		.orderBy("nombre", "ASC")
+//		.toList();
+
+	// las funciones de SQL tienen su propio metodo:
+//	var total_usuarios = SQL.buscar(Usuario.class).count("*");
+//	var edades_promedio = SQL.buscar(Usuario.class).avg("edad");
+//	var chikitito = SQL.buscar(Usuario.class).min("edad");
+//	var grandote = SQL.buscar(Usuario.class).max("edad");
+	//	sum
+	//	distinct
+
+
+	// queries manuales
+//	var todos = SQL.query("SELECT * FROM usuario;").toList();
+
+	//
+
+
+	//se pueden agregar relaciones
+//	SQL.relacionarTablas(Usuario.class, SQL.belongsTo, Empresa.class);
+//	SQL.relacionarTablas(Empresa.class, SQL.hasMany, Usuario.class);
+//	SQL.relacionarTablas(Usuario.class, SQL.hasOne, Perfil.class);
+//	SQL.relacionarTablas(Usuario.class, SQL.belongsToMany, Usuario.class, "amigos?");
+
+
 
 }
