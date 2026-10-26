@@ -31,13 +31,16 @@ void main() throws ORMException, SQLException{
 		19,
 		"What up, I'm Jared, I'm 19, and I never fucking learned how to read"
 	);
-	System.out.println("guardado: " + mi_usuario.guardado());
+	System.out.println("usuario: " + mi_usuario);
 	mi_usuario.guardar();
+	System.out.println("guardado: " + mi_usuario.guardado());
 
 	var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
+	System.out.println("pk: " + pk);
 
 	//Despues puedo buscarlo directamente por PK:
 	var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
+	System.out.println("desde la db: " + usuario_especifico);
 
 	//O puedo buscar lo que quiera:
 //	var jared = SQL.buscar(Usuario.class)

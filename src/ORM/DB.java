@@ -5,8 +5,7 @@ import ORM.Annotations.GuardarComo;
 import ORM.Annotations.NoSeGuarda;
 import ORM.Clases.Tabla;
 import ORM.Exceptions.*;
-import ORM.Queries.AlterTableQuery;
-import ORM.Queries.CreateTableQuery;
+import ORM.Queries.*;
 import ORM.Queries.SelectQuery;
 import ORM.SQL.Columna;
 import ORM.SQL.Schema;
@@ -20,6 +19,7 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.*;
@@ -86,6 +86,9 @@ public class DB{
 	@SafeVarargs
 	public static void registrarTablas(Class<? extends Tabla> ...clases)
 	throws ORMException, SQLException{
+
+		if(!tablas.isEmpty()) throw new NoLeisteElReadmeException();
+
 		for(final var clase : clases){
 			if(tablas.containsKey(clase)) return;
 
@@ -100,42 +103,74 @@ public class DB{
 
 	}
 
-	public static Object valorDePK(Tabla fila)
-	throws TablaNoRegistradaException,
-	       TablaModificadaException
-	{
-		final var schema = tablas.get(fila.getClass());
-		if(schema == null) throw new TablaNoRegistradaException(fila.getClass());
-		final var pk = schema.pk();
-		pk.setAccessible(true);
+	public static Object valorDeColumna(Tabla fila, Columna columna)
+	throws ORMException{
+		final var field = DB.buscarFieldParaColumna(fila.getClass(), columna);
+		Objects.requireNonNull(field).setAccessible(true);
 		try{
-			return pk.get(fila);
+			return field.get(fila);
 		} catch(IllegalAccessException e){
 			// NOTE: esto no debería pasar nunca salvo que se haya
 			//       modificado la DB mientras la app está funcionando.
-			throw new TablaModificadaException(schema.tabla(), pk.getName());
+			final var schema = tablas.get(fila.getClass());
+			if(schema == null) throw new TablaNoRegistradaException(fila.getClass());
+			throw new TablaModificadaException(schema.tabla(), field.getName());
 		}
 	}
 
-	static public boolean guardar(Tabla fila){
-		//TODO:
-//		fila.guardado = true;
-		return false;
+	public static Object valorDePK(Tabla fila)
+	throws ORMException{
+		final var schema = tablas.get(fila.getClass());
+		if(schema == null) throw new TablaNoRegistradaException(fila.getClass());
+		return valorDeColumna(fila, schema.columnas().get(schema.pk()));
+	}
+
+	static public boolean guardar(Tabla fila) throws SQLException{
+		if(fila.guardado()) return true;
+		final var tabla     = tablas.get(fila.getClass());
+		final var query     = new InsertIntoQuery(tabla, fila);
+		final var statement = query.toPreparedStatement(conexion);
+		return statement.executeUpdate() > 0;
+	}
+
+	static public <T extends Tabla> ArrayList<T> ejecutarQuery(
+		Query query,
+		Class<? extends Tabla> tabla
+	) throws SQLException{
+		final var statement = query.toPreparedStatement(conexion);
+		final var results   = statement.executeQuery();
+		return resultSetAFilas(results, tabla);
+	}
+
+	static private <T extends Tabla> ArrayList<T> resultSetAFilas(
+		ResultSet results,
+		Class<? extends Tabla> tabla
+	) throws SQLException{
+		final var filas = new ArrayList<T>();
+		while(results.next()){
+			filas.add(instanciarTabla(tabla, ));
+		}
+		return filas;
+	}
+
+	static private void instanciarTabla(tabla){
+		//TODO: reflect
 	}
 
 	static public SelectQuery buscar(
 		Class<? extends Tabla> tabla
 	){
-		final var nombre_tabla = tablas.get(tabla).tabla();
-		return new SelectQuery(nombre_tabla);
+		return new SelectQuery(tabla);
 	}
 
 	static public Tabla buscarPorPK(
 		Class<? extends Tabla> tabla,
 		Object pk
-	){
-		//TODO:
-		return null;
+	) throws TablaNoRegistradaException, ColumnaAusenteException{
+		final var schema = tablas.get(tabla);
+		if(schema == null) throw new TablaNoRegistradaException(tabla);
+		final var columna_pk = schema.columnas().get(schema.pk());
+		return buscar(tabla).where(columna_pk.nombre(), "=", pk.toString()).first();
 	}
 
 	static public void crearOActualizarTabla(
@@ -244,6 +279,30 @@ public class DB{
 		return success;
 	}
 
+
+	public static Columna getColumna(Schema schema, String nombre_columna)
+	throws ColumnaAusenteException{
+		for(var columna : schema.columnas().values()){
+			if(columna.nombre().equals(nombre_columna)) return columna;
+		}
+		throw new ColumnaAusenteException(nombre_columna, schema.tabla());
+	}
+
+	public static Columna getColumna(String nombre_tabla, String nombre_columna)
+	throws ColumnaAusenteException{
+		//TODO: probablemente necesito un mapa de string a tabla
+		//      para que esto sea mas rapido, porque se llama desde las queries
+		for(var schema : tablas.values()){
+			if(!schema.tabla().equals(nombre_tabla)) continue;
+			return getColumna(schema, nombre_columna);
+		}
+		throw new ColumnaAusenteException(nombre_columna, nombre_tabla);
+	}
+
+	public static Schema schemaDeTabla(Class<? extends Tabla> tabla){
+		return tablas.get(tabla);
+	}
+
 	//priv
 
 	static private Schema generarSchema(
@@ -347,4 +406,6 @@ public class DB{
 	static private String camelToSnake(String str){
 		return str.replaceAll("([a-z])([A-Z])", "$1_$2").toLowerCase();
 	}
+
+
 }

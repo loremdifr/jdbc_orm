@@ -1,8 +1,15 @@
 package ORM.Queries;
 
 
-sealed interface Query permits
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+
+sealed public interface Query permits
 	SelectQuery,
 	AlterTableQuery,
-	CreateTableQuery
-{ }
+	CreateTableQuery,
+	InsertIntoQuery
+{
+	PreparedStatement toPreparedStatement(Connection conexion) throws SQLException;
+}

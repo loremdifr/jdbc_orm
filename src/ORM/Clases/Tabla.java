@@ -2,8 +2,8 @@ package ORM.Clases;
 
 import ORM.Annotations.NoSeGuarda;
 import ORM.DB;
-import ORM.Exceptions.TablaModificadaException;
-import ORM.Exceptions.TablaNoRegistradaException;
+import ORM.Exceptions.ORMException;
+import java.sql.SQLException;
 
 
 public abstract class Tabla{
@@ -13,13 +13,14 @@ public abstract class Tabla{
 
 	//TODO: relaciones..?
 
-	public boolean guardar(){ return DB.guardar(this); }
 	public boolean guardado(){ return guardado; }
+	public boolean guardar() throws SQLException{
+		final var result = DB.guardar(this);
+		if(result) guardado = true;
+		return result;
+	}
 
-	public Object PK()
-	throws TablaModificadaException,
-		TablaNoRegistradaException
-	{
+	public Object PK() throws ORMException{
 		return DB.valorDePK(this);
 	}
 
