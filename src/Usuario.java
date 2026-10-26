@@ -1,5 +1,6 @@
 import ORM.Annotations.ClavePrimaria;
 import ORM.Annotations.GuardarComo;
+import ORM.Annotations.NoSeGuarda;
 import ORM.Relaciones.ManyToOne;
 import ORM.SQL.TipoColumna;
 import ORM.Clases.Tabla;
@@ -13,6 +14,8 @@ public class Usuario extends Tabla{
 	private final String             nombre;
 	private final int                edad;
 	private final LocalDateTime      ultimaModificacion;
+
+	@NoSeGuarda
 	private final ManyToOne<Empresa> empresa;
 
 	@GuardarComo(tipo = TipoColumna.TEXT)

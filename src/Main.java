@@ -38,9 +38,11 @@ void main() throws ORMException, SQLException{
 	var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
 	System.out.println("pk: " + pk);
 
-	//Despues puedo buscarlo directamente por PK:
-	var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
-	System.out.println("desde la db: " + usuario_especifico);
+	try{
+		//Despues puedo buscarlo directamente por PK:
+		var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
+		System.out.println("desde la db: " + usuario_especifico);
+	}catch(Exception e){}
 
 	//O puedo buscar lo que quiera:
 //	var jared = SQL.buscar(Usuario.class)

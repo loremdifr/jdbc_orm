@@ -15,6 +15,7 @@ import javax.naming.OperationNotSupportedException;
 
 import java.io.IOException;
 import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -134,27 +135,57 @@ public class DB{
 	}
 
 	static public <T extends Tabla> ArrayList<T> ejecutarQuery(
-		Query query,
-		Class<? extends Tabla> tabla
-	) throws SQLException{
+		Query query, Class<T> tabla
+	) throws SQLException,
+			 ORMException,
+			 InvocationTargetException,
+			 NoSuchMethodException,
+			 InstantiationException,
+			 IllegalAccessException
+	{
 		final var statement = query.toPreparedStatement(conexion);
 		final var results   = statement.executeQuery();
 		return resultSetAFilas(results, tabla);
 	}
 
 	static private <T extends Tabla> ArrayList<T> resultSetAFilas(
-		ResultSet results,
-		Class<? extends Tabla> tabla
-	) throws SQLException{
+		ResultSet results, Class<T> tabla
+	) throws SQLException,
+		NoSuchMethodException,
+		InvocationTargetException,
+		InstantiationException,
+		IllegalAccessException, ORMException{
 		final var filas = new ArrayList<T>();
+		final var schema = tablas.get(tabla);
 		while(results.next()){
-			filas.add(instanciarTabla(tabla, ));
+			final var constructor = tabla.getConstructor();
+			constructor.setAccessible(true);
+			final var instancia = constructor.newInstance();
+
+			//rellenar ojeto
+			for(var entry : schema.columnas().entrySet()){
+				final var field = entry.getKey();
+				final var col   = entry.getValue();
+				final var label = col.nombre();
+				final var valor = switch(col.tipo()){
+					case BOOL     -> results.getBoolean(label);
+					case INT      -> results.getInt(label);
+					case BIGINT   -> results.getLong(label);
+					case FLOAT    -> results.getFloat(label);
+					case DOUBLE   -> results.getDouble(label);
+					case DECIMAL  -> results.getBigDecimal(label);
+					case VARCHAR  -> results.getString(label);
+					case TEXT     -> results.getString(label); //TODO: Clob?
+					case DATETIME -> results.getTimestamp(label);
+					case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
+				};
+				field.setAccessible(true);
+				field.set(instancia, valor);
+			}
+
+			filas.add(tabla.cast(instancia));
 		}
 		return filas;
-	}
-
-	static private void instanciarTabla(tabla){
-		//TODO: reflect
 	}
 
 	static public SelectQuery buscar(
@@ -166,7 +197,7 @@ public class DB{
 	static public Tabla buscarPorPK(
 		Class<? extends Tabla> tabla,
 		Object pk
-	) throws TablaNoRegistradaException, ColumnaAusenteException{
+	) throws ORMException, SQLException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException{
 		final var schema = tablas.get(tabla);
 		if(schema == null) throw new TablaNoRegistradaException(tabla);
 		final var columna_pk = schema.columnas().get(schema.pk());

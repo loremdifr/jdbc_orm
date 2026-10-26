@@ -2,6 +2,9 @@ package ORM.Queries;
 
 import ORM.SQL.Schema;
 
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 
 public record CreateTableQuery(Schema schema) implements Query{
@@ -40,4 +43,9 @@ public record CreateTableQuery(Schema schema) implements Query{
 			schema.tabla(), String.join(",\n", cols_str));
 	}
 
+	@Override
+	public PreparedStatement toPreparedStatement(Connection conexion) throws SQLException{
+		//TODO:
+		return null;
+	}
 }

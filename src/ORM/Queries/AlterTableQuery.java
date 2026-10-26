@@ -1,6 +1,10 @@
 package ORM.Queries;
 
 import ORM.SQL.Columna;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
 import java.util.ArrayList;
 
 
@@ -9,4 +13,11 @@ public record AlterTableQuery(
 	ArrayList<Columna> add_columns,
 	ArrayList<Columna> modify_columns,
 	ArrayList<Columna> drop_columns
-) implements Query{}
+) implements Query{
+
+	@Override
+	public PreparedStatement toPreparedStatement(Connection conexion) throws SQLException{
+		//TODO:
+		return null;
+	}
+}

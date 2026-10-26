@@ -2,8 +2,10 @@ package ORM.Queries;
 import ORM.Clases.Tabla;
 import ORM.DB;
 import ORM.Exceptions.ColumnaAusenteException;
+import ORM.Exceptions.ORMException;
 import ORM.SQL.Schema;
 
+import java.lang.reflect.InvocationTargetException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -17,7 +19,7 @@ public final class SelectQuery implements Query{
 	final private ArrayList<Where>  wheres;
 	final private ArrayList<String> groupBy; //TODO:
 	final private ArrayList<String> orderBy; //TODO:
-	final private Integer           limit;
+	private Integer limit;
 
 	public SelectQuery(Class<? extends Tabla> from){
 		this.from    = from;
@@ -75,7 +77,7 @@ public final class SelectQuery implements Query{
 	public SelectQuery orderBy(){ return this; }
 
 	//results
-	public Tabla first() throws SQLException{
+	public Tabla first() throws SQLException, ORMException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException{
 		final var result = DB.ejecutarQuery(limit(1), from);
 		return result.getFirst();
 	}

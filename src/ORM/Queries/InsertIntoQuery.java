@@ -49,6 +49,8 @@ public record InsertIntoQuery(
 			)
 		);
 
+		//TODO: hay que filtrar especificamente la ID que puede ser null
+
 		for(int i = 0; i < valores.size(); i++){
 			final var valor = valores.get(i);
 			final var idx   = i + 1;
@@ -64,6 +66,7 @@ public record InsertIntoQuery(
 				case Double d     -> statement.setDouble    (idx, d);
 				case Float f      -> statement.setFloat     (idx, f);
 				case Long l       -> statement.setLong      (idx, l);
+				case null         -> statement.setNull(idx, Types.NULL);
 				default -> throw new UnsupportedOperationException();
 			}
 		}
