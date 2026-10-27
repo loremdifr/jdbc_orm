@@ -20,7 +20,7 @@ public record CreateTableQuery(Schema schema) implements Query{
 			final var col_str = new ArrayList<String>();
 
 			col_str.add(col.nombre()); //nombre
-			col_str.add(col.tipo().sqlString()); //tipo
+			col_str.add(col.tipo().toStringWithSize()); //tipo
 
 			//TODO: fk?
 			if(col.pk()){

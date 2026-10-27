@@ -25,29 +25,33 @@ void main() throws ORMException, SQLException{
 	// si le cambias los datos a la clase Usuario, se van a mantener
 	// actualizados en la DB solitos.
 
+	//como guardar datos y buscarlos:
 	try{
-		//guardar en la db es asi:
 		var mi_usuario = new Usuario(
 			"Jared",
 			19,
 			"What up, I'm Jared, I'm 19, and I never fucking learned how to read"
 		);
+
+		//guardar en la db es asi:
 		mi_usuario.guardar();
-		System.out.println("usuario: " + mi_usuario.toString());
+
+		System.out.println("usuario: " + mi_usuario);
 		System.out.println("guardado: " + mi_usuario.guardado());
 
 		var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
 		System.out.println("pk: " + pk);
+		System.out.println("id: " + mi_usuario.getId()); // defini id como PK asi que es lo mismo esto
 
 		//Despues puedo buscarlo directamente por PK:
-		var usuario_especifico = (Usuario) DB.buscarPorPK(Usuario.class, pk);
-		System.out.println("desde la db: " + usuario_especifico.toString());
+		var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
+		System.out.println("desde la db: " + usuario_especifico);
 	}catch(Exception e){
 		System.out.println(e);
 	}
 
 	//O puedo buscar lo que quiera:
-//	var jared = SQL.buscar(Usuario.class)
+//	var jared = DB.buscar(Usuario.class)
 ////		.where("nombre", "=", "Jared")
 //		.where("nombre", "LIKE", "J%")
 //		.andWhere("edad", ">", 18)
@@ -62,6 +66,7 @@ void main() throws ORMException, SQLException{
 //		.orderBy("nombre", "ASC")
 //		.toList();
 
+
 	// las funciones de SQL tienen su propio metodo:
 //	var total_usuarios = SQL.buscar(Usuario.class).count("*");
 //	var edades_promedio = SQL.buscar(Usuario.class).avg("edad");
@@ -75,14 +80,6 @@ void main() throws ORMException, SQLException{
 //	var todos = SQL.query("SELECT * FROM usuario;").toList();
 
 	//
-
-
-	//se pueden agregar relaciones
-//	SQL.relacionarTablas(Usuario.class, SQL.belongsTo, Empresa.class);
-//	SQL.relacionarTablas(Empresa.class, SQL.hasMany, Usuario.class);
-//	SQL.relacionarTablas(Usuario.class, SQL.hasOne, Perfil.class);
-//	SQL.relacionarTablas(Usuario.class, SQL.belongsToMany, Usuario.class, "amigos?");
-
 
 
 }

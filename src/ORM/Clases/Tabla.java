@@ -11,7 +11,6 @@ public abstract class Tabla{
 	@NoSeGuarda
 	private boolean guardado = false;
 
-	//TODO: relaciones..?
 
 	public boolean guardado(){ return guardado; }
 	public boolean guardar() throws SQLException, ORMException, IllegalAccessException{

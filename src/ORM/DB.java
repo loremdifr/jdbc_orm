@@ -1,15 +1,10 @@
 package ORM;
 
-import ORM.Annotations.ClavePrimaria;
-import ORM.Annotations.GuardarComo;
-import ORM.Annotations.NoSeGuarda;
-import ORM.Clases.Tabla;
+import ORM.Annotations.*;
+import ORM.Clases.*;
 import ORM.Exceptions.*;
 import ORM.Queries.*;
-import ORM.Queries.SelectQuery;
-import ORM.SQL.Columna;
-import ORM.SQL.Schema;
-import ORM.SQL.TipoColumna;
+import ORM.SQL.*;
 
 import javax.naming.OperationNotSupportedException;
 
@@ -38,6 +33,7 @@ public class DB{
 
 	private static final Connection conexion;
 	private static final Map<Class<? extends Tabla>, Schema> tablas;
+	private static final String nombre_db;
 
 
 	static {
@@ -64,6 +60,7 @@ public class DB{
 			throw new RuntimeException("SQL: " + e);
 		}
 
+		nombre_db = db;
 		tablas = new HashMap<>();
 	}
 
@@ -97,10 +94,13 @@ public class DB{
 			tablas.put(clase, schema);
 
 	//		Utils.prettyPrint(tablas);
-
 		}
-		//TODO: llamar a esto al final de todo
-//		crearOActualizarTabla(clase, schema);
+
+		for(var entry : tablas.entrySet()){
+			final var clase  = entry.getKey();
+			final var schema = entry.getValue();
+			crearOActualizarTabla(clase, schema);
+		}
 
 	}
 
@@ -286,11 +286,11 @@ public class DB{
 			//cols.getString("IS_AUTOINCREMENT") //TODO: usarlo
 			//TODO: extraer estos strings a un enum porque es un asco esto asi carlitos
 			final var column_name = cols.getString("COLUMN_NAME");
-			final var es_pk = column_name.equals(pk_name);
-
-			final var columna = new Columna(
+			final var es_pk       = column_name.equals(pk_name);
+			final var tipo_col    = TipoColumna.fromSqlType(cols.getInt("DATA_TYPE"));
+			final var columna     = new Columna(
 				column_name,
-				TipoColumna.fromString(cols.getString("TYPE_NAME")),
+				tipo_col,
 				cols.getString("IS_NULLABLE").equals("YES"),
 				es_pk
 			);
@@ -338,8 +338,12 @@ public class DB{
 
 	static public boolean existeTabla(Schema schema) throws SQLException{
 		final var statement = conexion.createStatement();
-		final var sql = "SELECT COUNT(*) FROM information_schema.tables WHERE table_name = '%s';";
-		final var result = statement.executeQuery(sql.formatted(schema.tabla()));
+		final var sql = """
+						SELECT COUNT(*) FROM information_schema.tables
+						WHERE table_schema = '%s'
+						AND table_name = '%s';
+						""";
+		final var result = statement.executeQuery(sql.formatted(nombre_db, schema.tabla()));
 		final var success = result.next() && result.getInt(1) > 0;
 		statement.close();
 		return success;
