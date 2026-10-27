@@ -4,6 +4,7 @@ import ORM.Clases.Tabla;
 import ORM.DB;
 import ORM.Exceptions.ORMException;
 import ORM.SQL.Schema;
+import ORM.SQL.TipoColumna;
 
 import java.math.BigDecimal;
 import java.sql.*;

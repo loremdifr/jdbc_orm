@@ -12,12 +12,10 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Modifier;
-import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.LocalDateTime;
 import java.util.*;
 
 
@@ -142,18 +140,7 @@ public class DB{
 
 			generated_keys.next(); //TODO: assert
 
-			final var nueva_pk = switch(col.tipo()){
-				case BOOL     -> generated_keys.getBoolean("GENERATED_KEY");
-				case INT      -> generated_keys.getInt("GENERATED_KEY");
-				case BIGINT   -> generated_keys.getLong("GENERATED_KEY");
-				case FLOAT    -> generated_keys.getFloat("GENERATED_KEY");
-				case DOUBLE   -> generated_keys.getDouble("GENERATED_KEY");
-				case DECIMAL  -> generated_keys.getBigDecimal("GENERATED_KEY");
-				case VARCHAR  -> generated_keys.getString("GENERATED_KEY");
-				case TEXT     -> generated_keys.getString("GENERATED_KEY"); //TODO: Clob?
-				case DATETIME -> generated_keys.getTimestamp("GENERATED_KEY");
-				case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
-			};
+			final var nueva_pk = TipoColumna.valueFromResult(col, generated_keys, "GENERATED_KEY");
 			pk_field.setAccessible(true);
 			pk_field.set(fila, nueva_pk);
 		}
@@ -166,7 +153,6 @@ public class DB{
 	) throws SQLException,
 			 ORMException,
 			 InvocationTargetException,
-			 NoSuchMethodException,
 			 InstantiationException,
 			 IllegalAccessException
 	{
@@ -178,7 +164,6 @@ public class DB{
 	static private <T extends Tabla> ArrayList<T> resultSetAFilas(
 		ResultSet results, Class<T> tabla
 	) throws SQLException,
-		NoSuchMethodException,
 		InvocationTargetException,
 		InstantiationException,
 		IllegalAccessException, ORMException{
@@ -193,23 +178,10 @@ public class DB{
 				for(var entry : schema.columnas().entrySet()){
 					final var field = entry.getKey();
 					final var col   = entry.getValue();
-					final var label = col.nombre();
-					final var valor = switch(col.tipo()){
-						case BOOL     -> results.getBoolean(label);
-						case INT      -> results.getInt(label);
-						case BIGINT   -> results.getLong(label);
-						case FLOAT    -> results.getFloat(label);
-						case DOUBLE   -> results.getDouble(label);
-						case DECIMAL  -> results.getBigDecimal(label);
-						case VARCHAR  -> results.getString(label);
-						case TEXT     -> results.getString(label); //TODO: Clob?
-						case DATETIME -> results.getTimestamp(label);
-						case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
-					};
+					final var valor = TipoColumna.valueFromResult(col, results);
 					field.setAccessible(true);
 					field.set(instancia, valor);
 				}
-
 				filas.add(tabla.cast(instancia));
 
 			}catch(NoSuchMethodException e){
@@ -254,20 +226,56 @@ public class DB{
 
 	}
 
-	private static void actualizarTabla(Schema schema_esperado, Schema schema_en_db){
-//		final var schema_diff = diferenciasEntreSchemas(schema, db_schema);
+	private static void actualizarTabla(
+		Schema schema_esperado,
+		Schema schema_en_db
+	) throws ORMException{
+		if(schema_en_db.equals(schema_esperado)) return; //pero si estas igual
 
-	}
+		if(!schema_en_db.tabla().equals(schema_esperado.tabla())){
+			//cambio el nombre????
+			throw new ORMException("Esto no deberia ser posible.");
+		}
 
-	private static AlterTableQuery diferenciasEntreSchemas(Schema esperado, Schema encontrado){
-		//campos a crear
+		//diff columnas
+		final var cols_esperadas   = schema_esperado.columnas();
+		final var cols_en_db       = schema_en_db.columnas();
+		final var cols_faltantes   = Utils.diffColumnas(cols_esperadas, cols_en_db);
+		final var cols_sobrantes   = Utils.diffColumnas(cols_en_db, cols_esperadas);
+		final var cols_a_modificar = new HashMap<String, Columna>();
 
-		//campos a modificar
+		for(final var entry : cols_esperadas.entrySet()){
+			final var field = entry.getKey();
+			final var col   = entry.getValue();
+			if(!cols_en_db.containsKey(field))    continue;
+			if(cols_faltantes.containsKey(field)) continue;
+			if(cols_sobrantes.containsKey(field)) continue;
 
-		//campos a borrar
+			final var col_en_db = cols_en_db.get(field);
 
-		//TODO:
-		return new AlterTableQuery(null, null, null);
+			if(!col_en_db.nombre().equals(col.nombre())
+			|| !col_en_db.tipo().equals(col.tipo())
+			|| col_en_db.pk() != col.pk()
+			|| col_en_db.not_null() != col.not_null()){
+				cols_a_modificar.put(col_en_db.nombre(), col);
+			}
+		}
+
+		final var super_query = new AlterTableQuery(
+			schema_esperado,
+			!schema_en_db.pk().equals(schema_esperado.pk()),
+			new ArrayList<>(cols_faltantes.values().stream().toList()),
+			new ArrayList<>(cols_sobrantes.values().stream().toList()),
+			cols_a_modificar
+		);
+
+		try{
+			final var statement = super_query.toPreparedStatement(conexion);
+			final var result    = statement.executeUpdate() > 0;
+		}catch(SQLException e){
+			throw new ORMException("Algo salió terriblemente mal :D");
+		}
+
 	}
 
 	private static Schema extraerSchemaDeDB(
@@ -442,7 +450,6 @@ public class DB{
 	static private TipoColumna tipoDeColumna(Field field)
 	throws TipoDeColumnaInvalidaException{
 		final var nota = field.getAnnotation(GuardarComo.class);
-		final var tipo = field.getType();
 
 		if(nota != null
 		&& nota.tipo() != null
@@ -450,23 +457,7 @@ public class DB{
 			return nota.tipo();
 		}
 
-		if(tipo == Boolean.class)       return TipoColumna.BOOL;
-		if(tipo == boolean.class)       return TipoColumna.BOOL;
-		if(tipo == int.class)           return TipoColumna.INT;
-		if(tipo == Integer.class)       return TipoColumna.INT;
-		if(tipo == long.class)          return TipoColumna.BIGINT;
-		if(tipo == Long.class)          return TipoColumna.BIGINT;
-		if(tipo == float.class)         return TipoColumna.FLOAT;
-		if(tipo == Float.class)         return TipoColumna.FLOAT;
-		if(tipo == double.class)        return TipoColumna.DOUBLE;
-		if(tipo == Double.class)        return TipoColumna.DOUBLE;
-		if(tipo == BigDecimal.class)    return TipoColumna.DECIMAL;
-		if(tipo == String.class)        return TipoColumna.VARCHAR;
-		if(tipo == LocalDateTime.class) return TipoColumna.DATETIME;
-
-		//TODO: imagenes? binary blob?
-
-		throw new TipoDeColumnaInvalidaException(field);
+		return TipoColumna.fromField(field);
 	}
 
 	static private String nombreDeColumna(Field field){
