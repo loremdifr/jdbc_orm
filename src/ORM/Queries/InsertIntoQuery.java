@@ -20,18 +20,24 @@ public record InsertIntoQuery(
 
 		final var query_str =
 		"""
-		INSERT INTO %s (%s) VALUES (%s) AS NUEVA_FILA
+		INSERT INTO %s (%s) VALUES (%s) AS %s
 		ON DUPLICATE KEY UPDATE %s;
 		""";
 
-		final var alias_fila = "NUEVA_TABLA";
+		final var alias_fila = "NUEVA_FILA";
 		final var columnas   = new ArrayList<String>();
 		final var valores    = new ArrayList<>();
 		final var update     = new ArrayList<String>();
 		try{
 			for(final var col : schema.columnas().values()){
+				final var valor = DB.valorDeColumna(fila, col);
+
+				// salteamos la PK si es null, porque estamos guardando
+				// algo nuevo y queremos que la DB la inserte
+				if(col.pk() && valor == null) continue;
+
 				columnas.add(col.nombre());
-				valores.add(DB.valorDeColumna(fila, col));
+				valores.add(valor);
 				update.add("%s = %s.%s".formatted(
 					 col.nombre(), alias_fila, col.nombre()
 				));
@@ -45,15 +51,17 @@ public record InsertIntoQuery(
 				schema.tabla(),
 				String.join(", ", columnas),
 				"?, ".repeat(valores.size() - 1) + " ?",
+				alias_fila,
 				String.join(", ", update)
-			)
+			),
+			Statement.RETURN_GENERATED_KEYS //necesario para poder hidratar la PK
 		);
 
-		//TODO: hay que filtrar especificamente la ID que puede ser null
 
 		for(int i = 0; i < valores.size(); i++){
 			final var valor = valores.get(i);
 			final var idx   = i + 1;
+			//TODO: esto deberia estar centralizado con la operacion inversa
 			switch(valor){
 				case Integer in   -> statement.setInt       (idx, in);
 				case String s     -> statement.setString    (idx, s);

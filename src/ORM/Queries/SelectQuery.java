@@ -99,7 +99,7 @@ public final class SelectQuery implements Query{
 
 		final var sql_query = new StringBuilder();
 		sql_query.append("SELECT %s FROM %s".formatted(
-			columnas, schema.tabla()
+			String.join(", ", columnas), schema.tabla()
 		));
 
 		if(!wheres.isEmpty()){

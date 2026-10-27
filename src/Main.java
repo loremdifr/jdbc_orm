@@ -25,24 +25,26 @@ void main() throws ORMException, SQLException{
 	// si le cambias los datos a la clase Usuario, se van a mantener
 	// actualizados en la DB solitos.
 
-	//guardar en la db es asi:
-	var mi_usuario = new Usuario(
-		"Jared",
-		19,
-		"What up, I'm Jared, I'm 19, and I never fucking learned how to read"
-	);
-	System.out.println("usuario: " + mi_usuario);
-	mi_usuario.guardar();
-	System.out.println("guardado: " + mi_usuario.guardado());
-
-	var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
-	System.out.println("pk: " + pk);
-
 	try{
+		//guardar en la db es asi:
+		var mi_usuario = new Usuario(
+			"Jared",
+			19,
+			"What up, I'm Jared, I'm 19, and I never fucking learned how to read"
+		);
+		mi_usuario.guardar();
+		System.out.println("usuario: " + mi_usuario.toString());
+		System.out.println("guardado: " + mi_usuario.guardado());
+
+		var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
+		System.out.println("pk: " + pk);
+
 		//Despues puedo buscarlo directamente por PK:
-		var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
-		System.out.println("desde la db: " + usuario_especifico);
-	}catch(Exception e){}
+		var usuario_especifico = (Usuario) DB.buscarPorPK(Usuario.class, pk);
+		System.out.println("desde la db: " + usuario_especifico.toString());
+	}catch(Exception e){
+		System.out.println(e);
+	}
 
 	//O puedo buscar lo que quiera:
 //	var jared = SQL.buscar(Usuario.class)

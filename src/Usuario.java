@@ -10,16 +10,18 @@ import java.time.LocalDateTime;
 public class Usuario extends Tabla{
 
 	@ClavePrimaria
-	private final Integer            id;
-	private final String             nombre;
-	private final int                edad;
-	private final LocalDateTime      ultimaModificacion;
+	private Integer       id;
+	private String        nombre;
+	private int           edad;
+	private LocalDateTime ultimaModificacion;
 
 	@NoSeGuarda
-	private final ManyToOne<Empresa> empresa;
+	private ManyToOne<Empresa> empresa;
 
 	@GuardarComo(tipo = TipoColumna.TEXT)
-	private final String biografia;
+	private String biografia;
+
+	public Usuario(){}
 
 	public Usuario(
 		String nombre,
@@ -43,4 +45,12 @@ public class Usuario extends Tabla{
 	public LocalDateTime getUltimaModificacion() { return ultimaModificacion; }
 	public String        getBiografia()          { return biografia;          }
 	public Empresa       getEmpresa()            { return empresa.get();      }
+
+
+	@Override
+	public String toString(){
+		return "[id=%d, nombre=%s, edad=%d, bio=%s]".formatted(
+			id, nombre, edad, biografia
+		);
+	}
 }

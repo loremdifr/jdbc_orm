@@ -126,12 +126,39 @@ public class DB{
 		return valorDeColumna(fila, schema.columnas().get(schema.pk()));
 	}
 
-	static public boolean guardar(Tabla fila) throws SQLException{
+	static public boolean guardar(Tabla fila) throws SQLException, ORMException, IllegalAccessException{
 		if(fila.guardado()) return true;
 		final var tabla     = tablas.get(fila.getClass());
 		final var query     = new InsertIntoQuery(tabla, fila);
 		final var statement = query.toPreparedStatement(conexion);
-		return statement.executeUpdate() > 0;
+		final var result    = statement.executeUpdate() > 0;
+
+		//rellenar PK si se creo
+		if(result && fila.PK() == null){
+			final var generated_keys = statement.getGeneratedKeys();
+			final var schema   = tablas.get(fila.getClass());
+			final var pk_field = schema.pk();
+			final var col      = schema.columnas().get(pk_field);
+
+			generated_keys.next(); //TODO: assert
+
+			final var nueva_pk = switch(col.tipo()){
+				case BOOL     -> generated_keys.getBoolean("GENERATED_KEY");
+				case INT      -> generated_keys.getInt("GENERATED_KEY");
+				case BIGINT   -> generated_keys.getLong("GENERATED_KEY");
+				case FLOAT    -> generated_keys.getFloat("GENERATED_KEY");
+				case DOUBLE   -> generated_keys.getDouble("GENERATED_KEY");
+				case DECIMAL  -> generated_keys.getBigDecimal("GENERATED_KEY");
+				case VARCHAR  -> generated_keys.getString("GENERATED_KEY");
+				case TEXT     -> generated_keys.getString("GENERATED_KEY"); //TODO: Clob?
+				case DATETIME -> generated_keys.getTimestamp("GENERATED_KEY");
+				case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
+			};
+			pk_field.setAccessible(true);
+			pk_field.set(fila, nueva_pk);
+		}
+
+		return result;
 	}
 
 	static public <T extends Tabla> ArrayList<T> ejecutarQuery(
@@ -158,32 +185,40 @@ public class DB{
 		final var filas = new ArrayList<T>();
 		final var schema = tablas.get(tabla);
 		while(results.next()){
-			final var constructor = tabla.getConstructor();
-			constructor.setAccessible(true);
-			final var instancia = constructor.newInstance();
+			try{
+				final var constructor = tabla.getConstructor();
+				constructor.setAccessible(true);
+				final var instancia = constructor.newInstance();
+				//rellenar ojeto
+				for(var entry : schema.columnas().entrySet()){
+					final var field = entry.getKey();
+					final var col   = entry.getValue();
+					final var label = col.nombre();
+					final var valor = switch(col.tipo()){
+						case BOOL     -> results.getBoolean(label);
+						case INT      -> results.getInt(label);
+						case BIGINT   -> results.getLong(label);
+						case FLOAT    -> results.getFloat(label);
+						case DOUBLE   -> results.getDouble(label);
+						case DECIMAL  -> results.getBigDecimal(label);
+						case VARCHAR  -> results.getString(label);
+						case TEXT     -> results.getString(label); //TODO: Clob?
+						case DATETIME -> results.getTimestamp(label);
+						case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
+					};
+					field.setAccessible(true);
+					field.set(instancia, valor);
+				}
 
-			//rellenar ojeto
-			for(var entry : schema.columnas().entrySet()){
-				final var field = entry.getKey();
-				final var col   = entry.getValue();
-				final var label = col.nombre();
-				final var valor = switch(col.tipo()){
-					case BOOL     -> results.getBoolean(label);
-					case INT      -> results.getInt(label);
-					case BIGINT   -> results.getLong(label);
-					case FLOAT    -> results.getFloat(label);
-					case DOUBLE   -> results.getDouble(label);
-					case DECIMAL  -> results.getBigDecimal(label);
-					case VARCHAR  -> results.getString(label);
-					case TEXT     -> results.getString(label); //TODO: Clob?
-					case DATETIME -> results.getTimestamp(label);
-					case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
-				};
-				field.setAccessible(true);
-				field.set(instancia, valor);
+				filas.add(tabla.cast(instancia));
+
+			}catch(NoSuchMethodException e){
+				//TODO: mover a su propia exception, checkear en registrarTablas
+				throw new ORMException(
+					"Las clases que heredan de Tabla deben implementar un constructor sin argumentos."
+				);
 			}
 
-			filas.add(tabla.cast(instancia));
 		}
 		return filas;
 	}
