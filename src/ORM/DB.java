@@ -50,7 +50,7 @@ public class DB{
 		var pwd  = db_config.getProperty("pwd");
 
 		try{
-			var url_template = "jdbc:mysql://%s:%s/%s?useSSL=false&serverTimezone=UTC";
+			final var url_template = "jdbc:mysql://%s:%s/%s?useSSL=false";
 			conexion = DriverManager.getConnection(
 				url_template.formatted(host, port, db), usr, pwd
 			);
@@ -117,12 +117,6 @@ public class DB{
 		}
 	}
 
-	public static Object valorDePK(Tabla fila)
-	throws ORMException{
-		final var schema = tablas.get(fila.getClass());
-		if(schema == null) throw new TablaNoRegistradaException(fila.getClass());
-		return valorDeColumna(fila, schema.columnas().get(schema.pk()));
-	}
 
 	static public boolean guardar(Tabla fila) throws SQLException, ORMException, IllegalAccessException{
 		if(fila.guardado()) return true;
@@ -132,7 +126,7 @@ public class DB{
 		final var result    = statement.executeUpdate() > 0;
 
 		//rellenar PK si se creo
-		if(result && fila.PK() == null){
+		if(result && fila.getId() == null){
 			final var generated_keys = statement.getGeneratedKeys();
 			final var schema   = tablas.get(fila.getClass());
 			final var pk_field = schema.pk();
@@ -140,9 +134,9 @@ public class DB{
 
 			generated_keys.next(); //TODO: assert
 
-			final var nueva_pk = TipoColumna.valueFromResult(col, generated_keys, "GENERATED_KEY");
+			final var nueva_id = TipoColumna.valueFromResult(col, generated_keys, "GENERATED_KEY");
 			pk_field.setAccessible(true);
-			pk_field.set(fila, nueva_pk);
+			pk_field.set(fila, nueva_id);
 		}
 
 		return result;
@@ -195,20 +189,17 @@ public class DB{
 		return filas;
 	}
 
-	static public SelectQuery buscar(
-		Class<? extends Tabla> tabla
-	){
+	static public SelectQuery buscar(Class<? extends Tabla> tabla){
 		return new SelectQuery(tabla);
 	}
 
-	static public Tabla buscarPorPK(
+	static public Tabla buscarPorId(
 		Class<? extends Tabla> tabla,
-		Object pk
+		Integer id
 	) throws ORMException, SQLException, InvocationTargetException, NoSuchMethodException, InstantiationException, IllegalAccessException{
 		final var schema = tablas.get(tabla);
 		if(schema == null) throw new TablaNoRegistradaException(tabla);
-		final var columna_pk = schema.columnas().get(schema.pk());
-		return buscar(tabla).where(columna_pk.nombre(), "=", pk.toString()).first();
+		return buscar(tabla).where("id", "=", id).first();
 	}
 
 	static public void crearOActualizarTabla(
@@ -288,7 +279,7 @@ public class DB{
 		final var pk_name = pks.next() ? pks.getString("COLUMN_NAME") : null;
 
 		final var columnas = new HashMap<Field, Columna>();
-		Field  pk = null;
+		Field pk = null;
 
 		while(cols.next()){
 			//cols.getString("IS_AUTOINCREMENT") //TODO: usarlo
@@ -381,6 +372,19 @@ public class DB{
 		return tablas.get(tabla);
 	}
 
+	public static long hashearFila(Tabla fila) throws ORMException{
+		final var cols = columnasDeTabla(fila.getClass());
+		final var cols_en_orden = cols.values().stream().sorted().toList();
+		long hashcode = 6767676767676767L;
+
+		for(var col : cols_en_orden){
+			final var valor = valorDeColumna(fila, col);
+			hashcode *= 31;
+			hashcode += Objects.hashCode(valor);
+		}
+		return hashcode;
+	}
+
 	//priv
 
 	static private Schema generarSchema(
@@ -401,47 +405,46 @@ public class DB{
 		Class<? extends Tabla> tabla
 	) throws ORMException{
 		final var columnas = new HashMap<Field, Columna>();
-		//TODO: getDeclaredFields excluye campos heredados
-		final var fields = tabla.getDeclaredFields();
+		try{
+			final var clave_primaria = Tabla.class.getDeclaredField("id");
 
-		Field clave_primaria = null;
+			Class<?> curr_class = tabla;
+			while(curr_class != null && curr_class != Object.class){
+				for(var field : curr_class.getDeclaredFields()){
 
-		//inspeccionar todos los campos
-		for(var field : fields){
+					//saltear static
+					if(Modifier.isStatic(field.getModifiers())){
+						continue;
+					}
 
-			//saltear static
-			if(Modifier.isStatic(field.getModifiers())) continue;
+					//saltear no guardables
+					if(field.getAnnotation(NoSeGuarda.class) != null){
+						continue;
+					}
 
-			final var es_guardable = field.getAnnotation(NoSeGuarda.class)    == null;
-			final var es_pk        = field.getAnnotation(ClavePrimaria.class) != null;
-			final var es_nullable  = !es_pk && !field.getType().isPrimitive();
+					//ver si no se intento pisar la id
+					if(field.getName().equals("id")
+					&& curr_class != Tabla.class){
+						//TODO: hacer exception unica
+						throw new ORMException("Se intentó redefinir 'id' en '%s'".formatted(
+							tabla.toString()
+						));
+					}
 
-			if(!es_guardable && es_pk){
-				throw new PKNoGuardableException(tabla, field);
+					columnas.put(field, new Columna(
+						nombreDeColumna(field),
+						tipoDeColumna(field),
+						!field.getType().isPrimitive(),
+						field.equals(clave_primaria)
+					));
+
+					//TODO: resolver el tema de las claves foraneas
+				}
+				curr_class = curr_class.getSuperclass();
 			}
 
-			if(!es_guardable) continue;
-
-			if(es_pk && clave_primaria != null){
-				throw new PKsMultiplesException(
-					tabla, clave_primaria, field
-				);
-			}
-
-			if(es_pk) clave_primaria = field;
-
-			columnas.put(field, new Columna(
-				nombreDeColumna(field),
-				tipoDeColumna(field),
-				es_nullable,
-				es_pk
-			));
-
-			//TODO: resolver el tema de las claves foraneas
-		}
-
-		if(clave_primaria == null){
-			throw new PKAusenteException(tabla);
+		}catch(NoSuchFieldException e){
+			//jamas se tira esta exception porque Tabla tiene el campo
 		}
 
 		return columnas;

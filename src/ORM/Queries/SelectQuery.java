@@ -36,9 +36,17 @@ public final class SelectQuery implements Query{
 		String comparador,
 		String valor
 	) throws ColumnaAusenteException{
-		var columna = DB.getColumna(schema, nombre_columna);
+		final var _ = DB.getColumna(schema, nombre_columna);
 		wheres.add(new Where.BasicWhere(nombre_columna, comparador, valor));
 		return this;
+	}
+
+	public SelectQuery where(
+		String nombre_columna,
+		String comparador,
+		Integer valor_int
+	) throws ColumnaAusenteException{
+		return where(nombre_columna, comparador, valor_int.toString());
 	}
 
 	public SelectQuery where(String columna, String valor)
@@ -49,7 +57,7 @@ public final class SelectQuery implements Query{
 		String comparador,
 		String valor
 	) throws ColumnaAusenteException{
-		var columna = DB.getColumna(schema, nombre_columna);
+		final var _ = DB.getColumna(schema, nombre_columna);
 		wheres.add(new Where.BasicWhere(
 			nombre_columna, comparador, valor, Where.Conector.AND
 		));
@@ -61,7 +69,7 @@ public final class SelectQuery implements Query{
 		String comparador,
 		String valor
 	) throws ColumnaAusenteException{
-		var columna = DB.getColumna(schema, nombre_columna);
+		final var _ = DB.getColumna(schema, nombre_columna);
 		wheres.add(new Where.BasicWhere(
 			nombre_columna, comparador, valor, Where.Conector.OR
 		));

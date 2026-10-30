@@ -48,15 +48,14 @@ void main() throws ORMException, SQLException{
 		//Regla: no llames guardado() ni este if en las gestoras, solo llama
 		//guardar(). Esto es para la UI y para entender el ciclo de vida.
 
-		var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
-		System.out.println("pk: " + pk);
-		System.out.println("id: " + mi_usuario.getId()); // defini id como PK asi que es lo mismo esto
+		var id = mi_usuario.getId(); //una vez guardado, el ID se actualiza
+		System.out.println("pk: " + id);
 
-		//Despues puedo buscarlo directamente por PK:
-		var usuario_especifico = DB.buscarPorPK(Usuario.class, pk);
+		//Despues puedo buscarlo directamente por ID:
+		var usuario_especifico = DB.buscarPorId(Usuario.class, id);
 		System.out.println("desde la db: " + usuario_especifico);
 	}catch(Exception e){
-		System.out.println(e);
+		System.err.println(e);
 	}
 
 	//O puedo buscar lo que quiera:
