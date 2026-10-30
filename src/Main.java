@@ -39,6 +39,15 @@ void main() throws ORMException, SQLException{
 		System.out.println("usuario: " + mi_usuario);
 		System.out.println("guardado: " + mi_usuario.guardado());
 
+		//guardado() = "lo que tengo en memoria esta persistido y al dia".
+		// - objeto nuevo: false (nunca se guardo)
+		// - guardado y sin tocar nada desde entonces: true
+		// - editado algo despues del ultimo guardar(): false
+		//Si guardar() se llama cuando guardado() ya es true, no hace nada
+		//(asi no pisa el timestamp de modificacion).
+		//Regla: no llames guardado() ni este if en las gestoras, solo llama
+		//guardar(). Esto es para la UI y para entender el ciclo de vida.
+
 		var pk = mi_usuario.PK(); //una vez guardado, la clave primaria se actualiza
 		System.out.println("pk: " + pk);
 		System.out.println("id: " + mi_usuario.getId()); // defini id como PK asi que es lo mismo esto

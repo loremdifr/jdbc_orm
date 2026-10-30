@@ -60,24 +60,12 @@ public record InsertIntoQuery(
 
 
 		for(int i = 0; i < valores.size(); i++){
-			final var valor = valores.get(i);
-			final var idx   = i + 1;
-			//TODO: esto deberia estar centralizado con la operacion inversa
-			switch(valor){
-				case Integer in   -> statement.setInt       (idx, in);
-				case String s     -> statement.setString    (idx, s);
-				case BigDecimal b -> statement.setBigDecimal(idx, b);
-				case Boolean b    -> statement.setBoolean   (idx, b);
-				case Byte b       -> statement.setByte      (idx, b);
-				case Date d       -> statement.setDate      (idx, d);
-				case Time t       -> statement.setTime      (idx, t);
-				case Timestamp t  -> statement.setTimestamp (idx, t);
-				case Double d     -> statement.setDouble    (idx, d);
-				case Float f      -> statement.setFloat     (idx, f);
-				case Long l       -> statement.setLong      (idx, l);
-				case null         -> statement.setNull(idx, Types.NULL);
-				default -> throw new UnsupportedOperationException();
-			}
+			TipoColumna.valueIntoStatement(
+				statement,
+				i + 1, //el statement is 1-based quien sabe PORQUE!!!!
+				valores.get(i)
+			);
+
 		}
 		return statement;
 	}

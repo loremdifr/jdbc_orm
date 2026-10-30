@@ -6,10 +6,9 @@ import ORM.Exceptions.TipoDeColumnaInvalidaException;
 
 import java.lang.reflect.Field;
 import java.math.BigDecimal;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Types;
+import java.sql.*;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 public enum TipoColumna{
 	AUTO    (""),
@@ -21,6 +20,7 @@ public enum TipoColumna{
 	DECIMAL ("DECIMAL"),
 	VARCHAR ("VARCHAR", 255), //TODO: parametrizar?
 	TEXT    ("TEXT"),
+	DATE    ("DATE"),
 	DATETIME("DATETIME"),
 	;
 
@@ -42,6 +42,8 @@ public enum TipoColumna{
 		return "%s(%d)".formatted(sqlString, column_size);
 	}
 
+	// static ..
+
 	static public TipoColumna fromString(String str)
 	throws TipoDeColumnaInesperadoException{
 		for(var tipo_columna : values()){
@@ -49,6 +51,8 @@ public enum TipoColumna{
 		}
 		throw new TipoDeColumnaInesperadoException(str);
 	}
+
+	//TODO: todo esto tendria que salir de un mapeo en lugar de tantos switches
 
 	static public TipoColumna fromSqlType(int sql_type)
 	throws TipoDeColumnaInesperadoException{
@@ -62,6 +66,7 @@ public enum TipoColumna{
 			case Types.VARCHAR     -> VARCHAR;
 			case Types.LONGVARCHAR -> TEXT;
 			case Types.TIMESTAMP   -> DATETIME;
+			case Types.DATE        -> DATE;
 			default -> throw new TipoDeColumnaInesperadoException("" + sql_type);
 		};
 	}
@@ -80,6 +85,7 @@ public enum TipoColumna{
 		if(tipo == Double.class)        return TipoColumna.DOUBLE;
 		if(tipo == BigDecimal.class)    return TipoColumna.DECIMAL;
 		if(tipo == String.class)        return TipoColumna.VARCHAR;
+		if(tipo == LocalDate.class)     return TipoColumna.DATE;
 		if(tipo == LocalDateTime.class) return TipoColumna.DATETIME;
 
 		//TODO: imagenes? binary blob?
@@ -97,10 +103,38 @@ public enum TipoColumna{
 			case DOUBLE   -> result.getDouble(label);
 			case DECIMAL  -> result.getBigDecimal(label);
 			case VARCHAR  -> result.getString(label);
-			case TEXT     -> result.getString(label); //TODO: Clob?
-			case DATETIME -> result.getTimestamp(label);
-			case AUTO     -> throw new ORMException("Inés Perado"); //TODO:
+			case TEXT     -> result.getString(label);
+			case DATE     -> {
+				var date = result.getDate(label);
+				yield date == null ? null : date.toLocalDate();
+			}
+			case DATETIME -> {
+				var ts = result.getTimestamp(label);
+				yield ts == null ? null : ts.toLocalDateTime();
+			}
+			case AUTO -> throw new ORMException("Inés Perado"); //TODO:
 		};
+	}
+
+	static public void valueIntoStatement(
+		PreparedStatement statement,
+		int index,
+		Object value
+	) throws SQLException{
+		switch(value){
+			case Integer in      -> statement.setInt       (index, in);
+			case String s        -> statement.setString    (index, s);
+			case BigDecimal b    -> statement.setBigDecimal(index, b);
+			case Boolean b       -> statement.setBoolean   (index, b);
+			case Byte b          -> statement.setByte      (index, b);
+			case LocalDate d     -> statement.setDate      (index, Date.valueOf(d));
+			case LocalDateTime t -> statement.setTimestamp (index, Timestamp.valueOf(t));
+			case Double d        -> statement.setDouble    (index, d);
+			case Float f         -> statement.setFloat     (index, f);
+			case Long l          -> statement.setLong      (index, l);
+			case null            -> statement.setNull      (index, Types.NULL);
+			default -> throw new UnsupportedOperationException();
+		}
 	}
 
 	static public Object valueFromResult(Columna col, ResultSet result)

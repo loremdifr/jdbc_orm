@@ -7,10 +7,8 @@ pequenho ORM na Java
 
 
 #### TIPOS:
-- agregar LocalDate y DATE column
 - guardar Enums como VARCHAR
   - Checkear que todos los enums guardados ne la DB sean validos despues deregistrarTablas y tirar uan excpetion
-- fix LocalDateTime.. no funciona con timestamp como yo creia
 
 
 #### QUERIES:
