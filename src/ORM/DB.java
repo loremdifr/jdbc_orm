@@ -17,6 +17,7 @@ import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
+import java.util.stream.Collectors;
 
 
 //TODO: indices
@@ -94,10 +95,8 @@ public class DB{
 	//		Utils.prettyPrint(tablas);
 		}
 
-		for(var entry : tablas.entrySet()){
-			final var clase  = entry.getKey();
-			final var schema = entry.getValue();
-			crearOActualizarTabla(clase, schema);
+		for(var schema : tablas.values()){
+			crearOActualizarTabla(schema);
 		}
 
 	}
@@ -202,59 +201,64 @@ public class DB{
 		return buscar(tabla).where("id", "=", id).first();
 	}
 
-	static public void crearOActualizarTabla(
-		Class<? extends Tabla> tabla,
-		Schema schema
-	) throws SQLException, ORMException{
+	static public void crearOActualizarTabla(Schema schema)
+	throws SQLException, ORMException{
 		if(!existeTabla(schema)){
 			crearTabla(schema);
 		}else{
-			final var db_schema = extraerSchemaDeDB(tabla, schema.tabla());
-			if(db_schema.equals(schema)) return;
-
-			actualizarTabla(schema, db_schema);
+			final var db_cols = extraerColumnasDB(schema.tabla());
+			actualizarTabla(schema, db_cols);
 		}
 
 	}
 
 	private static void actualizarTabla(
 		Schema schema_esperado,
-		Schema schema_en_db
+		HashMap<String, Columna> cols_en_db
 	) throws ORMException{
-		if(schema_en_db.equals(schema_esperado)) return; //pero si estas igual
+		//TODO: checkear bien esto
+//		if(cols_en_db..equals(schema_esperado)) return; //pero si estas igual
 
-		if(!schema_en_db.tabla().equals(schema_esperado.tabla())){
-			//cambio el nombre????
-			throw new ORMException("Esto no deberia ser posible.");
-		}
+		final var cols_esperadas = (HashMap<String, Columna>) schema_esperado
+			.columnas()
+			.entrySet()
+			.stream()
+			.collect(Collectors.toMap(
+				x -> x.getValue().nombre(),
+				Map.Entry::getValue
+			));
 
 		//diff columnas
-		final var cols_esperadas   = schema_esperado.columnas();
-		final var cols_en_db       = schema_en_db.columnas();
 		final var cols_faltantes   = Utils.diffColumnas(cols_esperadas, cols_en_db);
 		final var cols_sobrantes   = Utils.diffColumnas(cols_en_db, cols_esperadas);
 		final var cols_a_modificar = new HashMap<String, Columna>();
 
+		boolean pk_cambiada = false;
 		for(final var entry : cols_esperadas.entrySet()){
-			final var field = entry.getKey();
-			final var col   = entry.getValue();
-			if(!cols_en_db.containsKey(field))    continue;
-			if(cols_faltantes.containsKey(field)) continue;
-			if(cols_sobrantes.containsKey(field)) continue;
+			final var nombre  = entry.getKey();
+			final var columna = entry.getValue();
 
-			final var col_en_db = cols_en_db.get(field);
+			if(!cols_en_db.containsKey(nombre))    continue;
+			if(cols_faltantes.containsKey(nombre)) continue;
+			if(cols_sobrantes.containsKey(nombre)) continue;
 
-			if(!col_en_db.nombre().equals(col.nombre())
-			|| !col_en_db.tipo().equals(col.tipo())
-			|| col_en_db.pk() != col.pk()
-			|| col_en_db.not_null() != col.not_null()){
-				cols_a_modificar.put(col_en_db.nombre(), col);
+			final var col_en_db   = cols_en_db.get(nombre);
+			final var nombre_diff = !col_en_db.nombre().equals(columna.nombre());
+			final var tipo_diff   = !col_en_db.tipo().equals(columna.tipo());
+			final var pk_diff     = col_en_db.pk() != columna.pk();
+			final var null_diff   = col_en_db.not_null() != columna.not_null();
+
+			if(nombre_diff || tipo_diff || pk_diff || null_diff){
+				cols_a_modificar.put(col_en_db.nombre(), columna);
 			}
+
+			if(pk_diff) pk_cambiada = true;
+
 		}
 
 		final var super_query = new AlterTableQuery(
 			schema_esperado,
-			!schema_en_db.pk().equals(schema_esperado.pk()),
+			pk_cambiada,
 			new ArrayList<>(cols_faltantes.values().stream().toList()),
 			new ArrayList<>(cols_sobrantes.values().stream().toList()),
 			cols_a_modificar
@@ -269,17 +273,14 @@ public class DB{
 
 	}
 
-	private static Schema extraerSchemaDeDB(
-		Class<? extends Tabla> esperada,
-		String tabla_nombre
-	) throws SQLException, ORMException{
+	private static HashMap<String, Columna> extraerColumnasDB(String tabla_nombre)
+	throws SQLException, ORMException{
 		final var meta_data = conexion.getMetaData();
 		final var cols    = meta_data.getColumns(null, null, tabla_nombre, "%");
 		final var pks     = meta_data.getPrimaryKeys(null, null, tabla_nombre);
 		final var pk_name = pks.next() ? pks.getString("COLUMN_NAME") : null;
 
-		final var columnas = new HashMap<Field, Columna>();
-		Field pk = null;
+		final var columnas = new HashMap<String, Columna>();
 
 		while(cols.next()){
 			//cols.getString("IS_AUTOINCREMENT") //TODO: usarlo
@@ -290,26 +291,12 @@ public class DB{
 			final var columna     = new Columna(
 				column_name,
 				tipo_col,
-				cols.getString("IS_NULLABLE").equals("YES"),
+				cols.getString("IS_NULLABLE").equals("NO"),
 				es_pk
 			);
-
-			//field equivalente
-			final var field = buscarFieldParaColumna(esperada, columna);
-			if(field == null){ //notama.. el campito notamá
-				//TODO: borrarlo a la re mierda de la DB?
-				throw new ColumnaAusenteException(
-					columna.nombre(), esperada.toString()
-				);
-			}
-
-			//primo calvo
-			if(es_pk) pk = field;
-
-			columnas.put(field, columna);
+			columnas.put(column_name, columna);
 		}
-
-		return new Schema(tabla_nombre, columnas, pk);
+		return columnas;
 	}
 
 	private static Field buscarFieldParaColumna(
@@ -431,11 +418,13 @@ public class DB{
 						));
 					}
 
+					final var es_pk    = field.equals(clave_primaria);
+					final var not_null = field.getType().isPrimitive() || es_pk;
 					columnas.put(field, new Columna(
 						nombreDeColumna(field),
 						tipoDeColumna(field),
-						!field.getType().isPrimitive(),
-						field.equals(clave_primaria)
+						not_null,
+						es_pk
 					));
 
 					//TODO: resolver el tema de las claves foraneas

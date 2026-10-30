@@ -21,6 +21,8 @@ public record Columna(
 			col_str.add("AUTO_INCREMENT");
 			col_str.add("NOT NULL");
 			col_str.add("UNIQUE");
+		}else if(not_null){
+			col_str.add("NOT NULL");
 		}
 
 		//col_str.add("DEFAULT %s");

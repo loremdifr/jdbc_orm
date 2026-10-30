@@ -5,10 +5,13 @@ import ORM.Exceptions.TipoDeColumnaInesperadoException;
 import ORM.Exceptions.TipoDeColumnaInvalidaException;
 
 import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.time.LocalDate;
+import java.util.HashMap;
+import java.util.Map;
 
 public enum TipoColumna{
 	AUTO    (""),
@@ -43,6 +46,20 @@ public enum TipoColumna{
 	}
 
 	// static ..
+	static final private Map<Integer, String> sql_type_names;
+
+	static {
+		sql_type_names = new HashMap<>();
+		for(var field : Types.class.getFields()){
+			try{
+				sql_type_names.put(
+					field.getInt(null), //son static por eso null
+					field.getName()
+				);
+			}catch(IllegalAccessException _){}
+		}
+
+	}
 
 	static public TipoColumna fromString(String str)
 	throws TipoDeColumnaInesperadoException{
@@ -57,6 +74,8 @@ public enum TipoColumna{
 	static public TipoColumna fromSqlType(int sql_type)
 	throws TipoDeColumnaInesperadoException{
 		return switch(sql_type){
+			case Types.TINYINT     -> BOOL;
+			case Types.BIT         -> BOOL;
 			case Types.BOOLEAN     -> BOOL;
 			case Types.INTEGER     -> INT;
 			case Types.BIGINT      -> BIGINT;
@@ -67,7 +86,9 @@ public enum TipoColumna{
 			case Types.LONGVARCHAR -> TEXT;
 			case Types.TIMESTAMP   -> DATETIME;
 			case Types.DATE        -> DATE;
-			default -> throw new TipoDeColumnaInesperadoException("" + sql_type);
+			default -> throw new TipoDeColumnaInesperadoException(
+				sql_type_names.get(sql_type)
+			);
 		};
 	}
 

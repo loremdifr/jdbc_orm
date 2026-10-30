@@ -7,6 +7,7 @@ import javax.naming.OperationNotSupportedException;
 import java.lang.reflect.Field;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -46,17 +47,17 @@ public class Utils{
 		}
 	}
 
-	static HashMap<Field, Columna> diffColumnas(
-		HashMap<Field, Columna> a,
-		HashMap<Field, Columna> b
+	static HashMap<String, Columna> diffColumnas(
+		HashMap<String, Columna> a,
+		HashMap<String, Columna> b
 	){
 		if(a.equals(b)) return new HashMap<>();
 
 		final var entries_a = a.entrySet();
-		final var entries_b = b.entrySet();
+		final var keyset_b  = b.keySet();
 
-		return (HashMap<Field, Columna>) entries_a.stream()
-			.filter(x -> !entries_b.contains(x))
+		return (HashMap<String, Columna>) entries_a.stream()
+			.filter(x -> !keyset_b.contains(x.getKey()))
 			.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
 	}
 
